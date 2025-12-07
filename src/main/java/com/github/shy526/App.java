@@ -37,7 +37,7 @@ public class App
         }
         log.error(githubApiToken);
         log.error(ownerRepo);
-        log.error(caiMoGuToken);
+        log.error(caiMoGuToken+"!!!");
         log.error("配置设置正常");
 
         String gameIdsFileName="gameIds.txt";
