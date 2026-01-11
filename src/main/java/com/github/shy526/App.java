@@ -103,7 +103,7 @@ public class App {
         if (!acGameIds.isEmpty()) {
             gameIds.removeAll(acGameIds);
         }
-        if (!gameIds.isEmpty()) {
+/*        if (!gameIds.isEmpty()) {
             int trueFlag = 0;
             for (String gamId : gameIds) {
                 int code = CaiMoGuH5Help.acGameScore(gamId, "神中神非常好玩", "10", "1");
@@ -123,11 +123,10 @@ public class App {
                 }
             }
             log.error("成功评价游戏数量:{}", trueFlag);
-        }
+        }*/
 
         String acGameIdsStr = String.join("\n", acGameIds);
         GithubHelp.createOrUpdateFile(acGameIdsStr, acIdsFileName, ownerRepo, githubApiToken);
-
 
         Set<String> postIds = checkAcFileName(postIdsFileName, replyGroup, "1");
         int acPostNum = CaiMoGuH5Help.getRuleDetail(postIds);
@@ -135,7 +134,7 @@ public class App {
         log.error("成功评论帖子数量:{}", acPostNum);
 
 
-        Set<String> gameCommentIds = checkAcFileName(gameCommentFileName, replyGroup, "3");
+/*        Set<String> gameCommentIds = checkAcFileName(gameCommentFileName, replyGroup, "3");
         for (String gameId : gameIds) {
             if (gameCommentIds.contains(gameId)) {
                 continue;
@@ -148,7 +147,7 @@ public class App {
             }
         }
         GithubHelp.createOrUpdateFile(String.join("\n", gameCommentIds), gameCommentFileName, ownerRepo, githubApiToken);
-
+*/
 
         log.error("本次任务共获取影响力:{}", CaiMoGuH5Help.getPoint() - point);
         HashSet<String> temp = new HashSet<>();

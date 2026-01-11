@@ -28,8 +28,8 @@ public class CaiMoGuH5Help {
 
     public static boolean AcGameComment(String gameId) {
 
-        int page=1;
-        boolean hasMore=true;
+        int page = 1;
+        boolean hasMore = true;
         do {
             PageModel pageModel = getGameCommentPage(gameId, "newly", "all", String.valueOf(page));
             hasMore = pageModel.getHasMore();
@@ -44,10 +44,10 @@ public class CaiMoGuH5Help {
                 }
                 String id = item.getString("id");
                 int i = acGameCommentReply(id, "全对,神中神");
-                return i==0;
+                return i == 0;
             }
 
-        }while (hasMore);
+        } while (hasMore);
         return false;
 
     }
@@ -98,15 +98,19 @@ public class CaiMoGuH5Help {
         try (Response response = client.newCall(request).execute()) {
             if (response.isSuccessful()) {
                 JSONObject result = JSON.parseObject(response.body().string());
-                if (result.getInteger("code") == 0) {
+                int code = result.getIntValue("code");
+                if (code == 0) {
                     JSONObject data = result.getJSONObject("data");
                     PageModel pageModel = new PageModel();
                     pageModel.setHasMore(data.getBoolean("more"));
                     pageModel.setData(data.getList("list", JSONObject.class));
                     pageModel.setNextKey(data.getString("nextKey"));
                     return pageModel;
-                } else {
-                    log.error(result.toJSONString());
+                } else if (code == 10002) {
+                    Thread.sleep(1000);
+                    log.error("{}=>{}", url, result);
+                    return getGameCommentPage(gameId, order, type, page);
+
                 }
 
             }
@@ -147,8 +151,15 @@ public class CaiMoGuH5Help {
         try (Response response = client.newCall(request).execute()) {
             if (response.isSuccessful()) {
                 JSONObject result = JSON.parseObject(response.body().string());
-                return result.getInteger("code");
+                int code = result.getIntValue("code");
+                if (code == 10002) {
+                    Thread.sleep(1000);
+                    log.error("{}=>{}", url, result);
+                    return acGameCommentReply(msgId, content);
 
+                }
+
+                return code;
             }
         } catch (Exception ignored) {
 
@@ -194,7 +205,15 @@ public class CaiMoGuH5Help {
         try (Response response = client.newCall(request).execute()) {
             if (response.isSuccessful()) {
                 JSONObject result = JSON.parseObject(response.body().string());
-                return result.getInteger("code");
+                int code = result.getIntValue("code");
+                if (code == 10002) {
+                    Thread.sleep(1000);
+                    log.error("{}=>{}", url, result);
+                    return acGameScore(gameId, content, score, process);
+
+                }
+                return code;
+
 
             }
         } catch (Exception ignored) {
@@ -222,7 +241,7 @@ public class CaiMoGuH5Help {
                     LocalDateTime createTime = detail.getLocalDateTime("createTime");
                     long between = ChronoUnit.DAYS.between(createTime, now);
                     int replyNumber = detail.getIntValue("replyNumber");
-                    if (detailIds.contains(detaildId) || between > 10 || replyNumber <= 10) {
+                    if (detailIds.contains(detaildId) || between > 20 || replyNumber <= 10) {
                         continue;
                     }
                     String acComment = findRuleComment(detaildId);
@@ -236,7 +255,7 @@ public class CaiMoGuH5Help {
                     } else {
                         log.error("评论失败:{}-{}", circleId, detaildId);
                     }
-                    if (acCommentNum>=acCommentMax) {
+                    if (acCommentNum >= acCommentMax) {
                         return acCommentNum;
                     }
                 }
@@ -293,13 +312,19 @@ public class CaiMoGuH5Help {
         try (Response response = client.newCall(request).execute()) {
             if (response.isSuccessful()) {
                 JSONObject result = JSON.parseObject(response.body().string());
-                if (result.getInteger("code") == 0) {
+                int code = result.getIntValue("code");
+                if (code == 0) {
                     JSONObject data = result.getJSONObject("data");
                     PageModel pageModel = new PageModel();
                     pageModel.setHasMore(data.getIntValue("hasMore") != 0);
                     pageModel.setData(data.getList("list", JSONObject.class));
                     pageModel.setNextKey(data.getString("nextKey"));
                     return pageModel;
+                } else if (code == 10002) {
+                    Thread.sleep(1000);
+                    log.error("{}=>{}", url, result);
+                    return getCommentPage(detailId, order, page);
+
                 }
 
             }
@@ -331,14 +356,18 @@ public class CaiMoGuH5Help {
         try (Response response = client.newCall(request).execute()) {
             if (response.isSuccessful()) {
                 JSONObject result = JSON.parseObject(response.body().string());
-                if (result.getInteger("code") == 0) {
+                int code = result.getIntValue("code");
+                if (code == 0) {
                     PageModel pageModel = new PageModel();
                     JSONObject data = result.getJSONObject("data");
                     pageModel.setHasMore(data.getBoolean("more"));
                     pageModel.setData(data.getList("list", JSONObject.class));
                     return pageModel;
-                } else {
-                    log.error("{} => {}", url, result.toString());
+                } else if (code == 10002) {
+                    Thread.sleep(1000);
+                    log.error("{}=>{}", url, result);
+                    return getGamePage(sort, page);
+
                 }
 
             }
@@ -372,8 +401,14 @@ public class CaiMoGuH5Help {
         try (Response response = client.newCall(request).execute()) {
             if (response.isSuccessful()) {
                 JSONObject result = JSON.parseObject(response.body().string());
-                if (result.getInteger("code") == 0) {
+                Integer code = result.getInteger("code");
+                if (code == 0) {
                     return result.getList("data", JSONObject.class);
+                } else if (code == 10002) {
+                    Thread.sleep(1000);
+                    log.error("{}=>{}", url, result);
+                    return getDetailPage(id, type, page);
+
                 }
 
             }
@@ -401,7 +436,7 @@ public class CaiMoGuH5Help {
                 String type = item.getString("type");
                 String parentId = item.getString("parentId");
                 if (!"0".equals(parentId)) {
-                    type="3";
+                    type = "3";
                 }
                 String targetId = item.getString("targetId");
                 if (type == null || targetId == null) {
@@ -457,9 +492,15 @@ public class CaiMoGuH5Help {
         try (Response response = client.newCall(request).execute()) {
             if (response.isSuccessful()) {
                 JSONObject result = JSON.parseObject(response.body().string());
-                if (result.getInteger("code") == 0) {
+                int code = result.getIntValue("code");
+                if (code == 0) {
                     JSONObject data = result.getJSONObject("data");
                     return true;
+                } else if (code == 10002) {
+                    Thread.sleep(1000);
+                    log.error("{}=>{}", url, result);
+                    return acComment(pId, content);
+
                 }
             }
         } catch (Exception ignored) {
@@ -490,16 +531,22 @@ public class CaiMoGuH5Help {
         try (Response response = client.newCall(request).execute()) {
             if (response.isSuccessful()) {
                 JSONObject result = JSON.parseObject(response.body().string());
-                if (result.getInteger("code") == 0) {
+                int code = result.getIntValue("code");
+                if (code == 0) {
                     JSONObject data = result.getJSONObject("data");
                     PageModel pageModel = new PageModel();
                     pageModel.setHasMore(data.getIntValue("hasMore") != 0);
                     pageModel.setData(data.getList("list", JSONObject.class));
                     pageModel.setNextKey(data.getString("nextKey"));
                     return pageModel;
-                }
+                } else if (code == 10002) {
+                    Thread.sleep(1000);
+                    log.error("{}=>{}", url, result);
+                    return getReplyList(nextKey);
 
+                }
             }
+
         } catch (Exception ignored) {
 
         }
@@ -528,11 +575,17 @@ public class CaiMoGuH5Help {
         try (Response response = client.newCall(request).execute()) {
             if (response.isSuccessful()) {
                 JSONObject result = JSON.parseObject(response.body().string());
-                if (result.getInteger("code") == 0) {
+                int code = result.getIntValue("code");
+                if (code == 0) {
                     JSONObject data = result.getJSONObject("data");
                     Integer point = data.getInteger("point");
                     Config.INSTANCE.userInfo.setPoint(point);
                     return point;
+                } else if (code == 10002) {
+                    Thread.sleep(1000);
+                    log.error("{}=>{}", url, result);
+                    return getPoint();
+
                 }
 
             }
@@ -579,13 +632,18 @@ public class CaiMoGuH5Help {
         try (Response response = client.newCall(request).execute()) {
             if (response.isSuccessful()) {
                 JSONObject result = JSON.parseObject(response.body().string());
-                if (result.getInteger("code") == 0) {
+                int code = result.getIntValue("code");
+                if (code == 0) {
                     JSONObject data = result.getJSONObject("data");
                     UserInfo userInfo = new UserInfo();
                     userInfo.setUid(data.getString("uid"));
                     userInfo.setASuthorization("Bearer " + data.getString("token"));
                     userInfo.setNickname(data.getString("nickname"));
                     Config.INSTANCE.userInfo = userInfo;
+                } else if (code == 10002) {
+                    Thread.sleep(1000);
+                    loginH5(username, password);
+                    log.error("{}=>{}", url, result.toString());
                 }
             } else {
                 log.error("登录失败");
