@@ -1,7 +1,12 @@
 package com.github.shy526;
 
+
+import com.github.shy526.caimogu.CaiMoGuH5Help;
 import com.github.shy526.caimogu.CaiMoGuHelp;
+import com.github.shy526.config.Config;
 import com.github.shy526.github.GithubHelp;
+import com.github.shy526.vo.GithubInfo;
+import com.github.shy526.vo.UserInfo;
 import lombok.extern.slf4j.Slf4j;
 
 import java.time.LocalDate;
@@ -10,142 +15,194 @@ import java.util.*;
 
 /**
  * Hello world!
- *
  */
 @Slf4j
-public class App 
-{
-    public static void main( String[] args )
-    {
+public class App {
+    public static void main(String[] args) {
         log.error("启动踩蘑菇获取影响力任务");
         String githubApiToken = System.getenv("MY_GITHUB_API_TOKEN");
         String ownerRepo = System.getenv("OWNER_REPO");
-        String caiMoGuToken =  System.getenv("CAI_MO_GU_TOKEN");
-        int clout = CaiMoGuHelp.getClout(caiMoGuToken);
-        String nickname = CaiMoGuHelp.getNickname(caiMoGuToken);
-        log.error("当前用户:{},影响力:{}",nickname,clout);
-        if (clout==-1){
-            log.error("CAI_MO_GU_TOKEN 已经失效 重新获取(浏览器中f12 应用程序 Cookie 中的 cmg_token )");
+        String userName = System.getenv("CMG_NAME");
+        String password = System.getenv("CMG_PASSWORD");
+        GithubInfo githubInfo = new GithubInfo();
+        githubInfo.setGithubApiToken(githubApiToken);
+        githubInfo.setOwnerRepo(ownerRepo);
+        Config.INSTANCE.GithubInfo = githubInfo;
+        if (ownerRepo == null || ownerRepo.trim().isEmpty()) {
+            log.error("OWNER_REPO 未设置");
             return;
         }
-        if (githubApiToken==null|| githubApiToken.trim().isEmpty()){
-            log.error("MY_GITHUB_API_TOKEN 参数没有配置(githubApiToken)");
+        if (password == null || password.trim().isEmpty()) {
+            log.error("CMG_PASSWORD 未设置");
             return;
         }
-        if (ownerRepo==null|| ownerRepo.trim().isEmpty()){
-            log.error("OWNER_REPO 参数没有配置(github用户名/github仓库名)");
+        if (userName == null || userName.trim().isEmpty()) {
+            log.error("CMG_NAME 未设置");
             return;
         }
-        if (caiMoGuToken==null|| caiMoGuToken.trim().isEmpty()){
-            log.error("CAI_MO_GU_TOKEN 参数没有配置(浏览器中f12 应用程序 Cookie 中的 cmg_token )");
+
+        if (githubApiToken == null || githubApiToken.trim().isEmpty()) {
+            log.error("MY_GITHUB_API_TOKEN 未设置");
             return;
         }
-        log.error("配置设置正常");
+        log.error("配置设置未缺失");
+
+        CaiMoGuH5Help.loginH5(userName, password);
+        UserInfo userInfo = Config.INSTANCE.userInfo;
+        if (userInfo == null) {
+            log.error("踩蘑菇 用户名/密码错误,或者踩蘑菇接口失效");
+            return;
+        }
+
+        int point = CaiMoGuH5Help.getPoint();
+        log.error("当前用户:{},影响力:{}", userInfo.getNickname(), userInfo.getPoint());
 
 
+        String suffix = ".txt";
+        String gameIdsFileName = "gameIds.txt";
+        String acIdsFileName = "acIds-" + userInfo.getUid() + suffix;
+        String postIdsFileName = "postIds-" + userInfo.getUid() + suffix;
+        String gameCommentFileName = "gameComment-" + userInfo.getUid() + suffix;
 
-        String gameIdsFileName="gameIds.txt";
-        String acIdsFileName="acIds.txt";
-        String postIdsFileName="postIds.txt";
-        String runFileName="run.txt";
 
+        deleteGithubFile(gameIdsFileName);
 
-        Set<String> run = CaiMoGuHelp.readResources(runFileName);
-        LocalDate current = LocalDate.now();;
+        LocalDate current = LocalDate.now();
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-        Iterator<String> iterator = run.iterator();
-        String dateStr = iterator.hasNext() ? iterator.next() : null;
-        if (dateStr!=null){
-            LocalDate date = LocalDate.parse(dateStr, formatter);
-            if (current.isEqual(date)||current.isBefore(date)) {
-                log.error("今日任务已经执行,若要重复执行请删run.txt");
-                return;
-            }
+        Set<String> df = new HashSet<>();
+        //type=1 帖子Id type=2 游戏Id 3 评论过游戏库中的评论
+        Map<String, Set<String>> nowReplyGroup = CaiMoGuH5Help.getReplyGroup(current);
+        userInfo.setMaxGame(userInfo.getMaxGame() - nowReplyGroup.getOrDefault("2", df).size());
+        userInfo.setMaxGameComment(userInfo.getMaxGameComment() - nowReplyGroup.getOrDefault("3", df).size());
+        userInfo.setMaxComment(userInfo.getMaxComment() - nowReplyGroup.getOrDefault("2", df).size());
+        log.error("{} 影响力获取渠道 剩余数量 帖子子回复数:{} 游戏评论回复:{} 游戏库评论:{}", current.format(formatter), userInfo.getMaxComment(), userInfo.getMaxGameComment(), userInfo.getMaxGame());
+
+        if (userInfo.getMaxComment() <= 0 && userInfo.getMaxGame() <= 0 && userInfo.getMaxGameComment() <= 0) {
+            log.error("{} 无可用渠道获取影响力", current.format(formatter));
+            return;
         }
 
-        Set<String> ids = CaiMoGuHelp.readResources(gameIdsFileName);
-        if(ids.isEmpty()){
-            ids = CaiMoGuHelp.ScanGameIds();
-            String idsStr = String.join("\n", ids);
-            GithubHelp.createOrUpdateFile(idsStr,gameIdsFileName,ownerRepo,githubApiToken);
+        //检查游戏库Id是否存在
+        Set<String> gameIds = CaiMoGuHelp.readResources(gameIdsFileName);
+        if (gameIds.isEmpty()) {
+            log.error("生成gameId");
+            gameIds = CaiMoGuHelp.ScanGameIds();
+            String idsStr = String.join("\n", gameIds);
+            GithubHelp.createOrUpdateFile(idsStr, gameIdsFileName, ownerRepo, githubApiToken);
         }
 
-        Set<String> acIds = CaiMoGuHelp.readResources(acIdsFileName);
-        Map<Integer, Set<String>> replyGroup =new HashMap<>();
-        if(acIds.isEmpty()){
-            //文件不存在时主动查寻回复中所有已经回复过的GameId
-             replyGroup = CaiMoGuHelp.getReplyGroup(caiMoGuToken);
-            Set<String> acIdSource = replyGroup.get(2);
-            acIds=acIdSource==null?acIds:acIdSource;
-            String idsStr = String.join("\n", acIds);
-            GithubHelp.createOrUpdateFile(idsStr,acIdsFileName,ownerRepo,githubApiToken);
-        }
+        Map<String, Set<String>> replyGroup = new HashMap<>();
+        Set<String> acGameIds = checkAcFileName(acIdsFileName, replyGroup, "2");
 
         //去掉交集
-        if (!acIds.isEmpty()) {
-            ids.removeAll(acIds);
+        if (!acGameIds.isEmpty()) {
+            gameIds.removeAll(acGameIds);
         }
-        if (ids.isEmpty()) {
+        // 如果已经评论完了 本地文件尝试扫描远程
+        if (gameIds.isEmpty()) {
             //无可用id时重新扫描
-            ids = CaiMoGuHelp.ScanGameIds();
+            gameIds = CaiMoGuHelp.ScanGameIds();
         }
-        if (!acIds.isEmpty()) {
-            ids.removeAll(acIds);
+        if (!acGameIds.isEmpty()) {
+            gameIds.removeAll(acGameIds);
         }
-        if (ids.isEmpty()) {
-            log.error("无可供评分的游戏");
-            return;
-        }
-
-        int trueFlag = 0;
-       for (String id : ids) {
-           int s = CaiMoGuHelp.actSore(id, caiMoGuToken);
-           if (s==1){
-                trueFlag++;
-                acIds.add(id);
-                log.error("评价成功 "+id);
-            }else if (s==0){
-
-               acIds.add(id);
-               log.error("重复评价 "+id);
+        if (!gameIds.isEmpty()) {
+            int trueFlag = 0;
+            for (String gamId : gameIds) {
+                int code = CaiMoGuH5Help.acGameScore(gamId, "神中神非常好玩", "10", "1");
+                if (code == 99999) {
+                    acGameIds.add(gamId);
+                    log.error("重复评价 " + gamId);
+                } else if (code == 0) {
+                    trueFlag++;
+                    acGameIds.add(gamId);
+                    log.error("评价成功 " + gamId);
+                } else {
+                    log.error("无法正常评论游戏");
+                    break;
+                }
+                if (trueFlag >= userInfo.getMaxGame()) {
+                    break;
+                }
             }
-            if (trueFlag == 3) {
+            log.error("成功评价游戏数量:{}", trueFlag);
+        }
+
+        String acGameIdsStr = String.join("\n", acGameIds);
+        GithubHelp.createOrUpdateFile(acGameIdsStr, acIdsFileName, ownerRepo, githubApiToken);
+
+        Set<String> postIds = checkAcFileName(postIdsFileName, replyGroup, "1");
+        int acPostNum = CaiMoGuH5Help.getRuleDetail(postIds);
+        GithubHelp.createOrUpdateFile(String.join("\n", postIds), postIdsFileName, ownerRepo, githubApiToken);
+        log.error("成功评论帖子:{}", acPostNum);
+
+
+        Set<String> gameCommentIds = checkAcFileName(gameCommentFileName, replyGroup, "3");
+
+        int gameCommentNum = 0;
+        for (String gameId : gameIds) {
+            if (gameCommentIds.contains(gameId)) {
+                continue;
+            }
+            gameCommentIds.add(gameId);
+            int i = CaiMoGuH5Help.acGameCommentReply(gameId, "说的全对,确实很好玩");
+            if (i == 0) {
+                gameCommentNum++;
+            }
+            if (gameCommentNum >= userInfo.getMaxGameComment()) {
                 break;
             }
-
         }
-        log.error("成功评价游戏数量:{}",trueFlag);
-        String acIdsStr = String.join("\n", acIds);
-        GithubHelp.createOrUpdateFile(acIdsStr,acIdsFileName,ownerRepo,githubApiToken);
+        GithubHelp.createOrUpdateFile(String.join("\n", gameCommentIds), gameCommentFileName, ownerRepo, githubApiToken);
 
-        //这里开始回复帖子
-        Set<String> postIds = CaiMoGuHelp.readResources(postIdsFileName);
-        if(postIds.isEmpty()){
-            //文件不存在时主动查寻回复中所有已经回复过的GameId
-            if (replyGroup.isEmpty()){
-                replyGroup = CaiMoGuHelp.getReplyGroup(caiMoGuToken);
-            }
-            Set<String> postIdS = replyGroup.get(1);
-            postIds=postIdS==null?postIds:postIdS;
-            String idsStr = String.join("\n", postIds);
-            GithubHelp.createOrUpdateFile(idsStr,postIdsFileName,ownerRepo,githubApiToken);
-        }
 
-        List<String> qzIds = Arrays.asList("449", "329", "369", "383", "282", "466");
-        int acPostNum = CaiMoGuHelp.exeAcPost(qzIds, postIds,caiMoGuToken);
-        log.error("成功评论帖子数量:{}",acPostNum);
-        int clout2 = CaiMoGuHelp.getClout(caiMoGuToken);
-        log.error("本次任务共获取影响力:{}",clout2-clout);
-        GithubHelp.createOrUpdateFile(String.join("\n", postIds),postIdsFileName,ownerRepo,githubApiToken);
-        GithubHelp.createOrUpdateFile(formatter.format(current),runFileName,ownerRepo,githubApiToken);
+        log.error("本次任务共获取影响力:{}", CaiMoGuH5Help.getPoint() - point);
     }
 
+    /**
+     * 清理非本用户的文件
+     * @param gameIdsFileName
+     */
+    private static void deleteGithubFile(String gameIdsFileName) {
+        GithubInfo githubInfo = Config.INSTANCE.GithubInfo;
+        UserInfo userInfo = Config.INSTANCE.userInfo;
+        String uid = userInfo.getUid();
+        String ownerRepo = githubInfo.getOwnerRepo();
+        String githubApiToken = githubInfo.getGithubApiToken();
+        List<String> files = GithubHelp.getListFileName(ownerRepo, githubApiToken, "src/main/resources");
+        for (String item : files) {
+            if (!item.endsWith(".txt") || item.equals(gameIdsFileName)) {
+                continue;
+            }
+            String[] split = item.split("-");
+            if (split.length < 2) {
+                GithubHelp.deleteFile(ownerRepo, githubApiToken, item);
+                log.error("delete  {}", item);
+                continue;
+            }
+            if (split[1].equals(uid)) {
+                GithubHelp.deleteFile(ownerRepo, githubApiToken, item);
+                log.error("delete  {}", item);
+            }
+        }
+    }
 
-
-
-
-
-
+    private static Set<String> checkAcFileName(String fileName, Map<String, Set<String>> replyGroup, String type) {
+        GithubInfo githubInfo = Config.INSTANCE.GithubInfo;
+        Set<String> checkIds = CaiMoGuHelp.readResources(fileName);
+        if (checkIds.isEmpty()) {
+            if (replyGroup.isEmpty()) {
+                replyGroup = CaiMoGuH5Help.getReplyGroup(null);
+            }
+            checkIds = replyGroup.get(type);
+            if (checkIds == null || checkIds.isEmpty()) {
+                return new HashSet<>();
+            }
+            log.error("{}数据同步", fileName);
+            GithubHelp.createOrUpdateFile(String.join("\n", checkIds), fileName, githubInfo.getOwnerRepo(), githubInfo.getGithubApiToken());
+        }
+        return checkIds;
+    }
 
 
 }

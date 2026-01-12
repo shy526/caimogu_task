@@ -17,6 +17,8 @@ jobs:
       - name: Build with Maven
         env:
           OWNER_REPO: ${{secrets.OWNER_REPO}}
-          CAI_MO_GU_TOKEN: ${{secrets.CAI_MO_GU_TOKEN}}
           MY_GITHUB_API_TOKEN: ${{secrets.MY_GITHUB_API_TOKEN}}
+          CMG_PASSWORD: ${{secrets.CMG_PASSWORD}}
+          CMG_NAME: ${{secrets.CMG_NAME}}
+
         run: mvn -B -q package --file pom.xml
