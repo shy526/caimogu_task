@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import okhttp3.*;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.codec.digest.DigestUtils;
+import org.jsoup.Jsoup;
 
 import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
@@ -238,10 +239,13 @@ public class CaiMoGuH5Help {
     }
 
     public static int getRuleDetail(Set<String> detailIds) {
-        List<String> circleIds = Arrays.asList("449", "329", "369", "383", "282", "466");
+        List<String> circleIds = Arrays.asList("449", "329", "369", "383", "282", "466","2298712");
         LocalDateTime now = LocalDateTime.now();
         int acCommentNum = 0;
         int acCommentMax = Config.INSTANCE.userInfo.getMaxComment();
+        if (acCommentMax <= 0) {
+            return acCommentNum;
+        }
         for (String circleId : circleIds) {
 
             int page = 1;
@@ -256,7 +260,7 @@ public class CaiMoGuH5Help {
                     LocalDateTime createTime = detail.getLocalDateTime("createTime");
                     long between = ChronoUnit.DAYS.between(createTime, now);
                     int replyNumber = detail.getIntValue("replyNumber");
-                    if (detailIds.contains(detaildId) || between > 20 || replyNumber <= 10) {
+                    if (detailIds.contains(detaildId) || between > 20 || replyNumber < 11) {
                         continue;
                     }
                     String acComment = findRuleComment(detaildId);
@@ -293,14 +297,20 @@ public class CaiMoGuH5Help {
                 if (praiseNumber > 0 || replyCount > 0) {
                     continue;
                 }
+
+
                 commentStrList.add(comment.getString("content"));
             }
         } while (pageSize > 0 && commentStrList.isEmpty());
         if (commentStrList.isEmpty()) {
-            return null;
+            return System.currentTimeMillis()+"";
         }
         int randomIndex = (int) (Math.random() * commentStrList.size());
-        return commentStrList.get(randomIndex);
+
+        String content = Jsoup.parse(commentStrList.get(randomIndex)).text();
+        String emoji = randomEmoji(6);
+        content+=emoji;
+        return content ;
 
     }
 
@@ -686,13 +696,13 @@ public class CaiMoGuH5Help {
         String timeStr = params.get("time");
         boolean flag = false;
         for (String key : params.keySet()) {
-            if (!flag) {
-                urlBuild.append("?");
-                flag = true;
-            } else {
-                urlBuild.append("&");
-            }
             if (selectKey.contains(key)) {
+                if (!flag) {
+                    urlBuild.append("?");
+                    flag = true;
+                } else {
+                    urlBuild.append("&");
+                }
                 String temp = params.get(key);
                 if (!key.equals("time") && !key.equals("sign")) {
 
@@ -752,7 +762,11 @@ public class CaiMoGuH5Help {
             byte[] encryptBytes = cipher.doFinal(val.getBytes(StandardCharsets.UTF_8));
             String aesBase64 = Base64.encodeBase64String(encryptBytes);
             if (aesBase64.startsWith("+")) {
-                aesBase64 = aesBase64.replace("+", "%2B");
+                aesBase64 = aesBase64.replaceFirst("\\+", "%2B");
+            }
+
+            if (aesBase64.startsWith("/")) {
+                aesBase64 = aesBase64.replaceFirst("/", "%2F");
             }
             return URLEncoder.encode(aesBase64, StandardCharsets.UTF_8.name());
 
@@ -760,5 +774,18 @@ public class CaiMoGuH5Help {
             log.error(ex.getMessage());
             return null;
         }
+    }
+
+    private static String randomEmoji(int emojiNum){
+        String formatHtml="<span class=\"emoji-inline\" contenteditable=\"false\"\n" +
+                "    ><img\n" +
+                "      src=\"https://resource.caimogu.cc/style/img/editor/emoji/%s.png?v=2\" /></span\n" +
+                "  >";
+        StringBuilder emojiBuilder = new StringBuilder();
+        for (int i = 0; i < emojiNum; i++) {
+            int num = (int)(Math.random() * 50) + 1;
+            emojiBuilder.append(  String.format(formatHtml,num+""));
+        }
+        return emojiBuilder.toString();
     }
 }

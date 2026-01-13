@@ -76,8 +76,7 @@ public class App {
         userInfo.setMaxGameComment(userInfo.getMaxGameComment() - nowReplyGroup.getOrDefault("3", df).size());
         userInfo.setMaxComment(userInfo.getMaxComment() - nowReplyGroup.getOrDefault("2", df).size());
         log.error("{} 影响力获取渠道 剩余数量 帖子子回复数:{} 游戏评论回复:{} 游戏库评论:{}", current.format(formatter), userInfo.getMaxComment(), userInfo.getMaxGameComment(), userInfo.getMaxGame());
-
-        if (userInfo.getMaxComment() <= 0 && userInfo.getMaxGame() <= 0 && userInfo.getMaxGameComment() <= 0) {
+        if ((userInfo.getMaxComment()+userInfo.getMaxGame()+userInfo.getMaxGameComment()) <= 0) {
             log.error("{} 无可用渠道获取影响力", current.format(formatter));
             return;
         }
@@ -109,6 +108,9 @@ public class App {
         if (!gameIds.isEmpty()) {
             int trueFlag = 0;
             for (String gamId : gameIds) {
+                if (trueFlag >= userInfo.getMaxGame()) {
+                    break;
+                }
                 int code = CaiMoGuH5Help.acGameScore(gamId, "神中神非常好玩", "10", "1");
                 if (code == 99999) {
                     acGameIds.add(gamId);
@@ -121,9 +123,7 @@ public class App {
                     log.error("无法正常评论游戏");
                     break;
                 }
-                if (trueFlag >= userInfo.getMaxGame()) {
-                    break;
-                }
+
             }
             log.error("成功评价游戏数量:{}", trueFlag);
         }
@@ -144,14 +144,16 @@ public class App {
             if (gameCommentIds.contains(gameId)) {
                 continue;
             }
-            gameCommentIds.add(gameId);
-            int i = CaiMoGuH5Help.acGameCommentReply(gameId, "说的全对,确实很好玩");
-            if (i == 0) {
-                gameCommentNum++;
-            }
             if (gameCommentNum >= userInfo.getMaxGameComment()) {
                 break;
             }
+            gameCommentIds.add(gameId);
+            int i = CaiMoGuH5Help.acGameCommentReply(gameId, "说的全对,确实很好玩");
+            if (i == 0) {
+                log.error("成功评论游戏库评论:{}", gameId);
+                gameCommentNum++;
+            }
+
         }
         GithubHelp.createOrUpdateFile(String.join("\n", gameCommentIds), gameCommentFileName, ownerRepo, githubApiToken);
 
