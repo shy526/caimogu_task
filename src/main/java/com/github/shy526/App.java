@@ -77,11 +77,11 @@ public class App {
         userInfo.setMaxComment(userInfo.getMaxComment() - nowReplyGroup.getOrDefault("2", df).size());
         log.error("{} 影响力获取渠道 剩余数量 帖子子回复数:{} 游戏评论回复:{} 游戏库评论:{}", current.format(formatter), userInfo.getMaxComment(), userInfo.getMaxGameComment(), userInfo.getMaxGame());
 
-        if (userInfo.getMaxComment() <= 0 && userInfo.getMaxGame() <= 0 && userInfo.getMaxGameComment() <= 0) {
+    /*    if ((userInfo.getMaxComment()+userInfo.getMaxGame()+userInfo.getMaxGameComment()) <= 0) {
             log.error("{} 无可用渠道获取影响力", current.format(formatter));
             return;
         }
-
+*/
         //检查游戏库Id是否存在
         Set<String> gameIds = CaiMoGuHelp.readResources(gameIdsFileName);
         if (gameIds.isEmpty()) {
@@ -133,9 +133,9 @@ public class App {
         GithubHelp.createOrUpdateFile(acGameIdsStr, acIdsFileName, ownerRepo, githubApiToken);
 
         Set<String> postIds = checkAcFileName(postIdsFileName, replyGroup, "1");
-     //   int acPostNum = CaiMoGuH5Help.getRuleDetail(postIds);
+        int acPostNum = CaiMoGuH5Help.getRuleDetail(postIds);
         GithubHelp.createOrUpdateFile(String.join("\n", postIds), postIdsFileName, ownerRepo, githubApiToken);
-       // log.error("成功评论帖子:{}", acPostNum);
+        log.error("成功评论帖子:{}", acPostNum);
 
 
         Set<String> gameCommentIds = checkAcFileName(gameCommentFileName, replyGroup, "3");
